@@ -102,3 +102,9 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# Data files and saved images
+*.svg
+*.png
+*.pdf
+*.dat
