@@ -193,8 +193,8 @@ class Figure:
         if len(range) != 2:
             raise TypeError('An axis_range must be an iterable of length 2. Received "{0}" '
                             'instead.'.format(type(range)))
-        self._axis_ranges[0][0] = min(range)
-        self._axis_ranges[0][1] = max(range)
+        new_range = [min(range), max(range)]
+        self._axis_ranges[0] = new_range
         return
 
     @property
@@ -206,8 +206,8 @@ class Figure:
         if len(range) != 2:
             raise TypeError('An axis_range must be an iterable of length 2. Received "{0}" '
                             'instead.'.format(type(range)))
-        self._axis_ranges[1][0] = min(range)
-        self._axis_ranges[1][1] = max(range)
+        new_range = [min(range), max(range)]
+        self._axis_ranges[1] = new_range
         return
 
     @property
@@ -395,15 +395,10 @@ class Figure:
         # Append command strings config first, then user commands and then plot commands
         command += '{0};{1};plot {2};'.format(self.__config_command,
                                               self.__user_command, self.__plot_command)
-        # Run process and pass command string through stdin pipe
+
+        # Run gnuplot with command.
         # The process will be persistent, so it will run until the user closes the plot window
-        proc_res = subprocess.run(['gnuplot', '-p', '-e', command], shell=False,
-                                  encoding='utf-8', universal_newlines=True, timeout=None,
-                                  stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                  stderr=subprocess.PIPE)
-        # Catch error from stderr and raise it
-        if proc_res.returncode != 0:
-            raise ChildProcessError(proc_res.stderr)
+        self.run(cmd=command, persistent=True)
         return command
 
     def save_figure(self, filename='myfigure', filetype=None):
@@ -438,15 +433,28 @@ class Figure:
                                                   self.__user_command, self.__plot_command)
         else:
             command += '{0};plot {1};'.format(self.__config_command, self.__plot_command)
+
+        # Run gnuplot with command
+        self.run(cmd=command, persistent=False)
+        return command
+
+    def run(self, cmd, persistent=False):
+        """
+        Start a gnuplot subprocess and run cmd.
+
+        @param str cmd: The command to be run with gnuplot
+        @param bool persistent: If the process should be persistent or not.
+        @return int: Subprocess return code
+        """
+        args = ['gnuplot', '-p', '-e', cmd] if persistent else ['gnuplot', '-e', cmd]
         # Run process and pass command string through stdin pipe
-        proc_res = subprocess.run(['gnuplot', '-e', command], shell=False, encoding='utf-8',
-                                  universal_newlines=True, timeout=self.__timeout,
-                                  stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                  stderr=subprocess.PIPE)
+        proc_res = subprocess.run(args, shell=False, encoding='utf-8', universal_newlines=True,
+                                  timeout=self.timeout, stdin=subprocess.PIPE,
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         # Catch error from stderr and raise it
         if proc_res.returncode != 0:
             raise ChildProcessError(proc_res.stderr)
-        return command
+        return proc_res
 
     def clear(self):
         self.__config_command = ''
@@ -477,8 +485,8 @@ if __name__ == "__main__":
     a.title = 'My fancy plot'
     a.xlabel = 'angle (rad)'
     a.ylabel = 'amplitude'
-    # a.xrange = [data[0, 0] - 0.1, data[0, -1] + 0.1]
-    # a.yrange = [1.2 * data[3].min(), 1.2 * data[3].max()]
+    a.xrange = [data[0, 0] - 0.1, data[0, -1] + 0.1]
+    a.yrange = [1.2 * data[3].min(), 1.2 * data[3].max()]
 
     a.plot_xy(1, 2, xerror_ind=5, yerror_ind=6, label='plottery 1')
     a.plot_xy(1, 3, xerror_ind=5, yerror_ind=6, label='plottery 2')
