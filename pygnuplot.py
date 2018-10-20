@@ -6,7 +6,6 @@
 import subprocess
 import platform
 import os
-import numpy as np
 
 if platform.system() == 'Linux':
     default_terminal = 'x11'
@@ -470,8 +469,9 @@ class Figure:
 
 
 if __name__ == "__main__":
-    a = Figure(use_default_style=False)
-    a.timeout = 10
+    import numpy as np
+
+    # Create example data for XY plot
     data = np.zeros([6, 25])
     data[0] = 2 * np.pi * np.arange(25) / 25
     data[1] = np.sin(data[0])
@@ -479,15 +479,24 @@ if __name__ == "__main__":
     data[3] = 2 * np.sin(data[0])
     data[4] = np.ones(len(data[0])) * 0.2 * (data[0][1]-data[0][0])
     data[5] = np.ones(len(data[0])) * 0.2
-    np.savetxt('mydata.dat', data.transpose(), delimiter=' ', header='stuff\nof no concern')
+    np.savetxt('mydata.dat', data.transpose(), delimiter='\t',
+               header='stuff\nof no concern')
 
-    a.datafile = 'mydata.dat'
+    # Create example data for image plot
+    imgdata = np.zeros([100, 100])
+    for x in range(100):
+        for y in range(100):
+            imgdata[x, y] = 1e6 * np.exp(-((x-50)**2/(2*20**2) + (y-50)**2/(2*10**2)))
+    np.savetxt('myimage.dat', imgdata.transpose(), fmt='%.15e', delimiter='\t',
+               header='An example matrix to demonstrate image plotting')
+
+    # Plot XY
+    a = Figure(datafile='mydata.dat', use_default_style=False, timeout=10)
     a.title = 'My fancy plot'
     a.xlabel = 'angle (rad)'
     a.ylabel = 'amplitude'
     a.xrange = [data[0, 0] - 0.1, data[0, -1] + 0.1]
     a.yrange = [1.2 * data[3].min(), 1.2 * data[3].max()]
-
     a.plot_xy(1, 2, xerror_ind=5, yerror_ind=6, label='plottery 1')
     a.plot_xy(1, 3, xerror_ind=5, yerror_ind=6, label='plottery 2')
     a.plot_xy(1, 4, xerror_ind=5, yerror_ind=6)
@@ -496,17 +505,19 @@ if __name__ == "__main__":
     a.save_figure('testfig.pdf')
     a.show()
 
-    # a = Figure()
-    # a.datafile = 'image.dat'
-    # a.title = 'Confocal XY scan'
-    # a.xlabel = 'X (µm)'
-    # a.ylabel = 'Y (µm)'
-    # a.xrange = [0, 100]
-    # a.yrange = [100, 200]
-    # a.plot_img(colorbar_label='counts/s')
-    # a.show()
-    # a.save_figure('testfig.png')
-    # a.save_figure('testfig.svg')
-    # a.save_figure('testfig.pdf')
+    # Plot image
+    a = Figure()
+    a.datafile = 'myimage.dat'
+    a.timeout = 10
+    a.title = 'Confocal XY scan'
+    a.xlabel = 'X (µm)'
+    a.ylabel = 'Y (µm)'
+    a.xrange = [0, 100]
+    a.yrange = [100, 200]
+    a.plot_img(colorbar_label='counts/s')
+    a.show()
+    a.save_figure('testfig.png')
+    a.save_figure('testfig.svg')
+    a.save_figure('testfig.pdf')
 
 
