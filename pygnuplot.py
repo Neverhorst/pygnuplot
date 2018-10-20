@@ -38,19 +38,19 @@ class Figure:
     _SET_XLABEL = 'set xlabel "{LABEL}" offset 0,0.5;'
     _SET_YLABEL = 'set ylabel "{LABEL}" offset 1.25,0;'
 
-    def __init__(self, datafile=None, use_qudi_style=True, timeout=None):
+    def __init__(self, datafile=None, use_default_style=False, timeout=None):
         self.__config_command = ''
         self.__user_command = ''
         self.__plot_command = ''
         self.__timeout = timeout
         self.__present_plots = 0
         self._datafile = datafile
-        self._use_qudi_style = bool(use_qudi_style)
-        self._font = 'Helvetica'
-        self._font_size = 14
+        self._use_default_style = bool(use_default_style)
+        self._font = None
+        self._font_size = None
         self._title = None
         self._axis_labels = [None, None]
-        self._axis_ranges = [[-10, 10], [-1, 1]]
+        self._axis_ranges = [None, None]
 
     @property
     def timeout(self):
@@ -65,13 +65,13 @@ class Figure:
         return
 
     @property
-    def use_qudi_style(self):
-        return self._use_qudi_style
+    def use_default_style(self):
+        return self._use_default_style
 
-    @use_qudi_style.setter
-    def use_qudi_style(self, use_qudi):
-        if isinstance(use_qudi, bool):
-            self._use_qudi_style = use_qudi
+    @use_default_style.setter
+    def use_default_style(self, use_default):
+        if isinstance(use_default, bool):
+            self._use_default_style = use_default
         return
 
     @property
@@ -263,7 +263,7 @@ class Figure:
         print(self.__plot_command)
         return
 
-    def _set_qudi_style(self):
+    def _set_style(self):
         self.__config_command += 'set style line 1 lw 2 pt 7 ps 0.7 lc rgb "#1f17f4";'
         self.__config_command += 'set style line 2 lw 2 pt 5 ps 0.7 lc rgb "#ffa40e";'
         self.__config_command += 'set style line 3 lw 2 pt 9 ps 0.7 lc rgb "#ff3487";'
@@ -281,9 +281,9 @@ class Figure:
             # Clear old config command
             self.__config_command = ''
 
-            # Apply qudi style if desired
-            if self.use_qudi_style:
-                self._set_qudi_style()
+            # Apply non-default style if desired
+            if not self.use_default_style:
+                self._set_style()
 
             # command_str = 'set key outside top center horizontal box;set key width graph;'
             if self.title is not None:
@@ -343,9 +343,9 @@ class Figure:
         # Clear old config command
         self.__config_command = ''
 
-        # Apply qudi style if desired
-        if self.use_qudi_style:
-            self._set_qudi_style()
+        # Apply non-default style if desired
+        if not self.use_default_style:
+            self._set_style()
 
         # command_str = 'set key outside top center horizontal box;set key width graph;'
         if self.title is not None:
@@ -383,13 +383,15 @@ class Figure:
             self.__plot_command += ', '
         self.__plot_command += plt_cmd
         self.__present_plots += 1
-        # Apply configuration/settings
-        # self._apply_figure_config()
+        return
 
     def show(self):
-        # set proper terminal
-        command = 'set terminal {0} font "{1},{2:d}";'.format(default_terminal,
-                                                              self.font, self.font_size)
+        # set proper terminal and global font style
+        if self.font and self.font_size:
+            command = 'set terminal {0} font "{1},{2:d}";'.format(default_terminal,
+                                                                  self.font, self.font_size)
+        else:
+            command = 'set terminal {0};'.format(default_terminal)
         # Append command strings config first, then user commands and then plot commands
         command += '{0};{1};plot {2};'.format(self.__config_command,
                                               self.__user_command, self.__plot_command)
@@ -412,13 +414,17 @@ class Figure:
             filename = split_name[0]
             filetype = split_name[1].lower() if filetype is None else filetype.lower()
 
+        if self.font and self.font_size:
+            font_spec = ' font "{0},{1:d}"'.format(self.font, self.font_size)
+        else:
+            font_spec = ''
         # Set terminal according to filetype
         if filetype == 'pdf':
-            command = 'set terminal pdfcairo font "{0},{1:d}";'.format(self.font, self.font_size)
+            command = 'set terminal pdfcairo{0};'.format(font_spec)
         elif filetype == 'png':
-            command = 'set terminal pngcairo font "{0},{1:d}";'.format(self.font, self.font_size)
+            command = 'set terminal pngcairo{0};'.format(font_spec)
         elif filetype == 'svg':
-            command = 'set terminal svg enhanced font "{0},{1:d}";'.format(self.font, self.font_size)
+            command = 'set terminal svg enhanced{0};'.format(font_spec)
         else:
             raise NameError('Invalid filetype specifier "{0}". Allowed filetypes are: pdf, png and '
                             'svg.'.format(filetype))
@@ -447,11 +453,16 @@ class Figure:
         self.__plot_command = ''
         self.__user_command = ''
         self.__present_plots = 0
+        self._font = None
+        self._font_size = None
+        self._title = None
+        self._axis_labels = [None, None]
+        self._axis_ranges = [None, None]
         return
 
 
 if __name__ == "__main__":
-    a = Figure()
+    a = Figure(use_default_style=False)
     a.timeout = 10
     data = np.zeros([6, 25])
     data[0] = 2 * np.pi * np.arange(25) / 25
@@ -466,8 +477,8 @@ if __name__ == "__main__":
     a.title = 'My fancy plot'
     a.xlabel = 'angle (rad)'
     a.ylabel = 'amplitude'
-    a.xrange = [data[0, 0] - 0.1, data[0, -1] + 0.1]
-    a.yrange = [1.2 * data[3].min(), 1.2 * data[3].max()]
+    # a.xrange = [data[0, 0] - 0.1, data[0, -1] + 0.1]
+    # a.yrange = [1.2 * data[3].min(), 1.2 * data[3].max()]
 
     a.plot_xy(1, 2, xerror_ind=5, yerror_ind=6, label='plottery 1')
     a.plot_xy(1, 3, xerror_ind=5, yerror_ind=6, label='plottery 2')
@@ -477,15 +488,15 @@ if __name__ == "__main__":
     a.save_figure('testfig.pdf')
     a.show()
 
-    a = Figure()
-    a.datafile = 'image.dat'
-    a.title = 'Confocal XY scan'
-    a.xlabel = 'X (µm)'
-    a.ylabel = 'Y (µm)'
-    a.xrange = [0, 100]
-    a.yrange = [100, 200]
-    a.plot_img(colorbar_label='counts/s')
-    a.show()
+    # a = Figure()
+    # a.datafile = 'image.dat'
+    # a.title = 'Confocal XY scan'
+    # a.xlabel = 'X (µm)'
+    # a.ylabel = 'Y (µm)'
+    # a.xrange = [0, 100]
+    # a.yrange = [100, 200]
+    # a.plot_img(colorbar_label='counts/s')
+    # a.show()
     # a.save_figure('testfig.png')
     # a.save_figure('testfig.svg')
     # a.save_figure('testfig.pdf')
