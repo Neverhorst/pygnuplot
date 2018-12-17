@@ -43,7 +43,9 @@ class Figure:
         self.__plot_command = ''
         self.__timeout = timeout
         self.__present_plots = 0
-        self._datafile = datafile
+        self._datafile = datafile if datafile is None else os.path.basename(datafile)
+        self._datadir = datafile if datafile is None else os.path.abspath(
+            os.path.join(datafile, os.pardir)).replace('\\', '/')
         self._use_default_style = bool(use_default_style)
         self._font = None
         self._font_size = None
@@ -211,7 +213,7 @@ class Figure:
 
     @property
     def datafile(self):
-        return self._datafile
+        return os.path.join(self._datadir, self._datafile)
 
     @datafile.setter
     def datafile(self, filepath):
@@ -228,7 +230,8 @@ class Figure:
         if num_cols < 1:
             raise ValueError('0 columns detected in datafile "{0}".'.format(filepath))
 
-        self._datafile = filepath
+        self._datafile = os.path.basename(filepath)
+        self._datadir = os.path.abspath(os.path.join(filepath, os.pardir)).replace('\\', '/')
         return
 
     def user_cmd(self, cmd_str):
@@ -259,7 +262,6 @@ class Figure:
         if self.__plot_command and not self.__plot_command.strip().endswith(','):
             self.__plot_command += ', '
         self.__plot_command += cmd_str
-        print(self.__plot_command)
         return
 
     def _set_style(self):
@@ -284,7 +286,7 @@ class Figure:
             if not self.use_default_style:
                 self._set_style()
 
-            # command_str = 'set key outside top center horizontal box;set key width graph;'
+            self.__config_command += 'set key outside top left horizontal box;'
             if self.title is not None:
                 self.__config_command += self._SET_TITLE.format(TITLE=self.title)
             if self.xrange is not None:
@@ -298,7 +300,10 @@ class Figure:
             if self.ylabel is not None:
                 self.__config_command += self._SET_YLABEL.format(LABEL=self.ylabel)
 
-        linestyle = 2 * self.__present_plots + 1
+        if not self._use_default_style:
+            linestyle = 2 * self.__present_plots + 1 if self.__present_plots > 1 else self.__present_plots * 3 + 1
+        else:
+            linestyle = 2 * self.__present_plots + 1
         err_linestyle = linestyle + 1
 
         if label is None:
@@ -309,27 +314,27 @@ class Figure:
 
         plt_cmd = ''
         if xerror_ind is not None and yerror_ind is not None:
-            plt_cmd += self._PLOT_XY_XYERR.format(FILE=self.datafile, TITLE=label, X=xdata_ind,
-                                                  Y=ydata_ind, XE=xerror_ind, YE=yerror_ind,
+            plt_cmd += self._PLOT_XY_XYERR.format(FILE=self._datafile, TITLE=label, X=xdata_ind+1,
+                                                  Y=ydata_ind+1, XE=xerror_ind+1, YE=yerror_ind+1,
                                                   LS=err_linestyle, XSCALE=xscale, YSCALE=yscale)
         elif xerror_ind is not None:
-            plt_cmd += self._PLOT_XY_XERR.format(FILE=self.datafile, TITLE=label, X=xdata_ind,
-                                                 Y=ydata_ind, XE=xerror_ind, LS=err_linestyle,
+            plt_cmd += self._PLOT_XY_XERR.format(FILE=self._datafile, TITLE=label, X=xdata_ind+1,
+                                                 Y=ydata_ind+1, XE=xerror_ind+1, LS=err_linestyle,
                                                  XSCALE=xscale, YSCALE=yscale)
         elif yerror_ind is not None:
-            plt_cmd += self._PLOT_XY_YERR.format(FILE=self.datafile, TITLE=label, X=xdata_ind,
-                                                 Y=ydata_ind, YE=yerror_ind, LS=err_linestyle,
+            plt_cmd += self._PLOT_XY_YERR.format(FILE=self._datafile, TITLE=label, X=xdata_ind+1,
+                                                 Y=ydata_ind+1, YE=yerror_ind+1, LS=err_linestyle,
                                                  XSCALE=xscale, YSCALE=yscale)
         else:
-            plt_cmd += self._PLOT_XY_LP.format(FILE=self.datafile, TITLE=label, X=xdata_ind,
-                                               Y=ydata_ind, LS=linestyle, XSCALE=xscale,
+            plt_cmd += self._PLOT_XY_LP_DASHED.format(FILE=self._datafile, TITLE=label, X=xdata_ind+1,
+                                               Y=ydata_ind+1, LS=linestyle, XSCALE=xscale,
                                                YSCALE=yscale)
 
         if xerror_ind is not None or yerror_ind is not None:
             plt_cmd += ', '
-            plt_cmd += self._PLOT_XY_LP_DASHED.format(FILE=self.datafile, TITLE=label, X=xdata_ind,
-                                                      Y=ydata_ind, LS=linestyle, XSCALE=xscale,
-                                                      YSCALE=yscale)
+            plt_cmd += self._PLOT_XY_LP_DASHED.format(FILE=self._datafile, TITLE=label,
+                                                      X=xdata_ind+1, Y=ydata_ind+1, LS=linestyle,
+                                                      XSCALE=xscale, YSCALE=yscale)
 
         if self.__plot_command and not self.__plot_command.strip().endswith(','):
             self.__plot_command = self.__plot_command.strip(';')
@@ -373,7 +378,7 @@ class Figure:
         if colorbar_label is not None:
             self.__config_command += 'set cblabel "{0}" offset 1,0;'.format('counts/s')
 
-        plt_cmd = self._PLOT_IMG.format(FILE=self.datafile,
+        plt_cmd = self._PLOT_IMG.format(FILE=self._datafile,
                                         XMIN=self.xrange[0], XMAX=self.xrange[1],
                                         YMIN=self.yrange[0], YMAX=self.yrange[1])
 
@@ -391,6 +396,8 @@ class Figure:
                                                                   self.font, self.font_size)
         else:
             command = 'set terminal {0};'.format(default_terminal)
+        if self._datadir:
+            command += 'cd "{0}";'.format(self._datadir)
         # Append command strings config first, then user commands and then plot commands
         command += '{0};{1};plot {2};'.format(self.__config_command,
                                               self.__user_command, self.__plot_command)
@@ -425,6 +432,8 @@ class Figure:
 
         # Set terminal output to file to create
         filename += '.{0}'.format(filetype)
+        if self._datadir:
+            command += 'cd "{0}";'.format(self._datadir)
         command += 'set output "{0}";'.format(filename)
         # Append command strings config first, then user commands and then plot commands
         if self.__user_command:
@@ -446,6 +455,7 @@ class Figure:
         @return int: Subprocess return code
         """
         args = ['gnuplot', '-p', '-e', cmd] if persistent else ['gnuplot', '-e', cmd]
+        print(cmd)
         # Run process and pass command string through stdin pipe
         proc_res = subprocess.run(args, shell=False, encoding='utf-8', universal_newlines=True,
                                   timeout=self.timeout, stdin=subprocess.PIPE,
